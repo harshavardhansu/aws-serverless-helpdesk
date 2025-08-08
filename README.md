@@ -1,2 +1,2 @@
-# aws-serverless-helpdesk
-A fully serverless IT support automation platform using AWS Lambda, Amazon Lex, and DynamoDB for real-time ticket handling.
+# Serverless IT Support Automation Platform
+A fully serverless IT support automation platform built on AWS Lambda, Amazon Lex, and DynamoDB, enabling real-time ticket processing and conversational AI support.
