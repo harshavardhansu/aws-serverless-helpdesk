@@ -1,28 +1,162 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>IT Help Desk Bot</title>
+  <meta charset="UTF-8">
+  <title>IT Help Desk Chatbot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1360.0.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Poppins', sans-serif; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .message-animate { animation: fadeIn 0.3s ease-out; }
+  </style>
 </head>
-<body>
-  <h2>💬 Chat with IT Help Desk</h2>
-  <div id="chat"></div>
-  <input id="userInput" type="text" placeholder="Type your question..." />
-  <button onclick="sendMessage()">Send</button>
+<body class="bg-white min-h-screen">
+  <div class="container mx-auto max-w-4xl p-6">
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-16 h-16 bg-black rounded-full mb-4">
+        <span class="text-2xl">🤖</span>
+      </div>
+      <h1 class="text-4xl font-bold text-black mb-2">IT Help Desk</h1>
+      <p class="text-gray-600 font-medium">Your AI-powered support assistant</p>
+    </div>
+    
+    <div class="bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+      <div class="bg-black p-4">
+        <div class="flex items-center gap-3">
+          <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+          <span class="text-white font-medium">Online</span>
+        </div>
+      </div>
+      
+      <div id="chat" class="h-96 overflow-y-auto p-6 space-y-4 bg-gray-50"></div>
+      
+      <div class="p-6 bg-white border-t border-gray-200">
+        <div class="flex gap-3">
+          <input id="msg" 
+                 class="flex-1 px-6 py-3 bg-white border-2 border-gray-300 text-black placeholder-gray-500 rounded-full focus:outline-none focus:border-black focus:ring-4 focus:ring-gray-200 transition-all duration-200" 
+                 placeholder="Ask me anything..." 
+                 onkeypress="if(event.key==='Enter') sendMessage()">
+          <button onclick="sendMessage()" 
+                  class="px-8 py-3 bg-black text-white rounded-full hover:bg-gray-800 focus:outline-none focus:ring-4 focus:ring-gray-300 transition-all duration-200 transform hover:scale-105 font-medium">
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  <script>
-    async function sendMessage() {
-      const input = document.getElementById("userInput").value;
-      document.getElementById("chat").innerHTML += `<p><strong>You:</strong> ${input}</p>`;
-      const response = await fetch("https://your-api-id.execute-api.ap-south-1.amazonaws.com/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: input })
-      });
+  <script type="module">
+    import { BOT_CONFIG } from './config.js';
+    
+    AWS.config.region = BOT_CONFIG.region;
+    AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+      IdentityPoolId: BOT_CONFIG.identityPoolId
+    });
 
-      const data = await response.json();
-      document.getElementById("chat").innerHTML += `<p><strong>Bot:</strong> ${data.message}</p>`;
-      document.getElementById("userInput").value = "";
+    const lexruntimev2 = new AWS.LexRuntimeV2();
+    const sessionId = Date.now().toString();
+
+    function appendMessage(sender, text) {
+      const chat = document.getElementById("chat");
+      const isUser = sender === "You";
+      const timestamp = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'} message-animate`;
+      
+      if (isUser) {
+        messageDiv.innerHTML = `
+          <div class="max-w-xs lg:max-w-md">
+            <div class="bg-black text-white px-6 py-3 rounded-2xl rounded-br-md shadow-lg">
+              <div class="font-medium">${text}</div>
+            </div>
+            <div class="text-xs text-gray-500 mt-1 text-right">${timestamp}</div>
+          </div>
+        `;
+      } else {
+        messageDiv.innerHTML = `
+          <div class="flex gap-3 max-w-xs lg:max-w-md">
+            <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-black text-sm font-bold flex-shrink-0">
+              AI
+            </div>
+            <div>
+              <div class="bg-white border border-gray-300 px-6 py-3 rounded-2xl rounded-bl-md shadow-lg">
+                <div class="text-black">${text}</div>
+              </div>
+              <div class="text-xs text-gray-500 mt-1">${timestamp}</div>
+            </div>
+          </div>
+        `;
+      }
+      
+      chat.appendChild(messageDiv);
+      chat.scrollTop = chat.scrollHeight;
     }
+
+    function showTyping() {
+      const chat = document.getElementById("chat");
+      const typingDiv = document.createElement('div');
+      typingDiv.id = 'typing-indicator';
+      typingDiv.className = 'flex justify-start message-animate';
+      typingDiv.innerHTML = `
+        <div class="flex gap-3 max-w-xs lg:max-w-md">
+          <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-black text-sm font-bold">
+            AI
+          </div>
+          <div class="bg-white border border-gray-300 px-6 py-3 rounded-2xl rounded-bl-md shadow-lg">
+            <div class="flex gap-1">
+              <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+              <div class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+              <div class="w-2 h-2 bg-gray-600 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+            </div>
+          </div>
+        </div>
+      `;
+      chat.appendChild(typingDiv);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function hideTyping() {
+      const typing = document.getElementById('typing-indicator');
+      if (typing) typing.remove();
+    }
+
+    window.sendMessage = function() {
+      const input = document.getElementById("msg");
+      const text = input.value.trim();
+      if (!text) return;
+
+      appendMessage("You", text);
+      input.value = "";
+      showTyping();
+
+      const params = {
+        botId: BOT_CONFIG.botId,
+        botAliasId: BOT_CONFIG.botAliasId,
+        localeId: BOT_CONFIG.localeId,
+        sessionId,
+        text
+      };
+
+      lexruntimev2.recognizeText(params, function (err, data) {
+        hideTyping();
+        if (err) {
+          console.error("Error: ", err);
+          appendMessage("Bot", "Sorry, I'm having trouble connecting. Please try again.");
+        } else {
+          const botReply = data.messages?.[0]?.content || "I didn't understand that. Could you rephrase?";
+          appendMessage("Bot", botReply);
+        }
+      });
+    };
+
+    // Welcome message
+    setTimeout(() => {
+      appendMessage("Bot", "👋 Hello! I'm your IT Help Desk assistant. I'm here to help with technical issues, password resets, software problems, and more. What can I assist you with today?");
+    }, 500);
   </script>
 </body>
 </html>

@@ -1,0 +1,17 @@
+# Environment variables
+.env
+frontend/env.js
+
+# AWS SAM
+.aws-sam/
+samconfig.toml
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
